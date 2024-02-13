@@ -74,19 +74,25 @@ export default function App() {
   }
 
   useEffect(() => {
+    const controller = new AbortController();
+
     async function fetchMovies() {
       try {
         setIsLoading(true);
         setError('');
         const res = await fetch(
-          `http://www.omdbapi.com/?apikey=${KEY}&s=${query}`
+          `http://www.omdbapi.com/?apikey=${KEY}&s=${query}`,
+          { signal: controller.signal }
         );
         if (!res.ok) throw new Error('Something went wrong getting data');
         const data = await res.json();
         if (data.Response === 'False') throw new Error('Movie not found');
         setMovies(data.Search);
       } catch (err) {
-        setError(err.message);
+        if (err.name !== 'AbortError') {
+          console.log(err.message);
+          setError(err.message);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -96,7 +102,12 @@ export default function App() {
       setError('');
       return;
     }
+    handleCloseMovie(); //close opened movie when we start searching
     fetchMovies();
+
+    return function () {
+      controller.abort();
+    };
   }, [query]);
 
   return (
@@ -238,7 +249,6 @@ function MovieDetails({ selectedId, onCloseMovie, onAddWatched, watched }) {
   const [userRating, setUserRating] = useState(0);
 
   const isWatched = watched.map(movie => movie.imdbID).includes(selectedId);
-  console.log(isWatched);
   const watchedUserRating = watched.find(
     movie => movie.imdbID === selectedId
   )?.userRating;
@@ -256,18 +266,18 @@ function MovieDetails({ selectedId, onCloseMovie, onAddWatched, watched }) {
     Genre: genre,
   } = movie;
 
-  console.log(
-    title,
-    year,
-    poster,
-    runtime,
-    imdbRating,
-    plot,
-    released,
-    actors,
-    director,
-    genre
-  );
+  // console.log(
+  //   title,
+  //   year,
+  //   poster,
+  //   runtime,
+  //   imdbRating,
+  //   plot,
+  //   released,
+  //   actors,
+  //   director,
+  //   genre
+  // );
 
   function handleAdd() {
     const newWatchedMovie = {
@@ -280,9 +290,22 @@ function MovieDetails({ selectedId, onCloseMovie, onAddWatched, watched }) {
       userRating,
     };
     onAddWatched(newWatchedMovie);
-    console.log(newWatchedMovie);
     onCloseMovie();
   }
+
+  useEffect(() => {
+    //Para event listeners tenemos que forzar la eliminación para que nose acumulen cada vez que se llaman, para ello creamos una función separada que llamaremos primero a ejecutar como listener y luego poder referenciar para destruir
+    function callback(e) {
+      if (e.code === 'Escape') {
+        onCloseMovie();
+      }
+    }
+    document.addEventListener('keydown', callback);
+
+    return function () {
+      document.removeEventListener('keydown', callback);
+    };
+  }, [onCloseMovie]);
 
   useEffect(() => {
     async function getMovieDetails() {
@@ -291,12 +314,20 @@ function MovieDetails({ selectedId, onCloseMovie, onAddWatched, watched }) {
         `http://www.omdbapi.com/?apikey=${KEY}&i=${selectedId}`
       );
       const data = await res.json();
-      console.log(data);
       setMovie(data);
       setIsLoading(false);
     }
     getMovieDetails();
   }, [selectedId]);
+
+  useEffect(() => {
+    if (!title) return;
+    document.title = `Movie | ${title}`;
+
+    return function () {
+      document.title = 'usePopcorn';
+    };
+  }, [title]);
 
   return (
     <div className="details">

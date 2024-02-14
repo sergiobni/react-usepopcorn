@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import StarRating from './StarRating';
 import { useMovies } from './useMovies';
 import { useLocalStorageState } from './useLocalStorageState';
+import { useKey } from './useKey';
 
 const KEY = '76cb77ce';
 
@@ -94,22 +95,12 @@ const average = arr =>
 
 function Search({ query, setQuery }) {
   const inputEl = useRef(null);
-  //Usamos effect para cargar el ref ya que tiene que cargar cuando el elemento está disponible
-  useEffect(() => {
-    function callback(e) {
-      //Guard clause, si estamos sobre la caja de búsqueda, evita que se ejecute lo siguiente
-      if (document.activeElement === inputEl.current) return;
 
-      //Limpiar la caja de búsqueda al pulsar enter
-      if (e.code === 'Enter') {
-        inputEl.current.focus();
-        setQuery('');
-      }
-    }
-    document.addEventListener('keydown', callback);
+  useKey('Enter', function () {
+    if (document.activeElement === inputEl.current) return;
     inputEl.current.focus();
-    return () => document.addEventListener('keydown', callback);
-  }, [setQuery]);
+    setQuery('');
+  });
 
   return (
     <input
@@ -225,19 +216,7 @@ function MovieDetails({ selectedId, onCloseMovie, onAddWatched, watched }) {
     onCloseMovie();
   }
 
-  useEffect(() => {
-    //Para event listeners tenemos que forzar la eliminación para que nose acumulen cada vez que se llaman, para ello creamos una función separada que llamaremos primero a ejecutar como listener y luego poder referenciar para destruir
-    function callback(e) {
-      if (e.code === 'Escape') {
-        onCloseMovie();
-      }
-    }
-    document.addEventListener('keydown', callback);
-
-    return function () {
-      document.removeEventListener('keydown', callback);
-    };
-  }, [onCloseMovie]);
+  useKey('Escape', onCloseMovie);
 
   useEffect(() => {
     async function getMovieDetails() {
